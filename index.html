@@ -4,228 +4,305 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ADHD Routine Tracker</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .loading { display: none; }
-        body { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        .timer-button {
+            width: 160px;
+            height: 160px;
+            border-radius: 24px;
+            border: 4px solid;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .timer-button:hover { transform: scale(1.05); }
+        .timer-button:active { transform: scale(0.95); }
+        .inactive { background: #4b5563; border-color: #6b7280; }
+        .active { background: #3b82f6; border-color: #60a5fa; animation: pulse 2s infinite; }
+        .completed { background: #10b981; border-color: #34d399; }
+        .streak-dot { width: 12px; height: 12px; border-radius: 50%; background: #10b981; margin: 2px; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .modal { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0,0,0,0.5); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 1000;
+        }
+        .modal-content { 
+            background: white; 
+            padding: 32px; 
+            border-radius: 24px; 
+            text-align: center; 
+            animation: bounce 0.5s ease-out;
+        }
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+        .achievement-modal { 
+            background: linear-gradient(135deg, #f59e0b, #ea580c); 
+            color: white; 
+            animation: pulse 1s ease-out infinite;
+        }
     </style>
 </head>
 <body>
-    <div id="root">
-        <div class="loading min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 flex items-center justify-center">
-            <div class="text-white text-2xl">Loading...</div>
+    <div class="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 p-8">
+        <div class="max-w-4xl mx-auto">
+            <div class="text-center mb-12">
+                <h1 class="text-4xl font-bold text-white mb-4 flex items-center justify-center gap-3">
+                    <span class="text-yellow-300 text-3xl">✨</span>
+                    Daily Routine Tracker
+                    <span class="text-yellow-300 text-3xl">✨</span>
+                </h1>
+                <p class="text-xl text-white/90">
+                    Tap to start • Tap again to finish • Build your streak!
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 justify-items-center mb-12">
+                <!-- Brush Teeth Button -->
+                <div class="flex flex-col items-center gap-4">
+                    <button id="brushTeethBtn" class="timer-button inactive" onclick="toggleActivity('brushTeeth')">
+                        <div class="text-4xl">🦷</div>
+                        <span class="text-sm font-medium">Brush Teeth</span>
+                        <div id="brushTeethTimer" class="text-2xl font-mono" style="display: none;">00:00</div>
+                        <div id="brushTeethCheck" class="text-green-200 text-2xl" style="display: none;">✓</div>
+                    </button>
+                    <div class="text-center">
+                        <div class="text-sm text-white/80 mb-1">
+                            Streak: <span id="brushTeethStreak">0</span> days
+                        </div>
+                        <div id="brushTeethDots" class="flex gap-1 justify-center"></div>
+                    </div>
+                </div>
+                
+                <!-- Shower Button -->
+                <div class="flex flex-col items-center gap-4">
+                    <button id="showerBtn" class="timer-button inactive" onclick="toggleActivity('shower')">
+                        <div class="text-4xl">🚿</div>
+                        <span class="text-sm font-medium">Take Shower</span>
+                        <div id="showerTimer" class="text-2xl font-mono" style="display: none;">00:00</div>
+                        <div id="showerCheck" class="text-green-200 text-2xl" style="display: none;">✓</div>
+                    </button>
+                    <div class="text-center">
+                        <div class="text-sm text-white/80 mb-1">
+                            Streak: <span id="showerStreak">0</span> days
+                        </div>
+                        <div id="showerDots" class="flex gap-1 justify-center"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+    <!-- Celebration Modal -->
+    <div id="celebrationModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="text-6xl mb-4">🎉</div>
+            <h2 class="text-3xl font-bold text-gray-800 mb-2">Great Job!</h2>
+            <p id="celebrationText" class="text-lg text-gray-600"></p>
+        </div>
+    </div>
+    
+    <!-- Achievement Modal -->
+    <div id="achievementModal" class="modal" style="display: none;">
+        <div class="modal-content achievement-modal">
+            <div class="text-6xl mb-4">🏆</div>
+            <h2 class="text-3xl font-bold mb-2">ACHIEVEMENT UNLOCKED!</h2>
+            <p id="achievementText" class="text-xl"></p>
+        </div>
+    </div>
 
-        const RoutineTracker = () => {
-          const [activities, setActivities] = useState({
+    <script>
+        // App state
+        let activities = {
             brushTeeth: { timer: 0, isActive: false, completedToday: false },
             shower: { timer: 0, isActive: false, completedToday: false }
-          });
-          
-          const [completedDays, setCompletedDays] = useState({
+        };
+        
+        let completedDays = {
             brushTeeth: [],
             shower: []
-          });
-          
-          const [showCelebration, setShowCelebration] = useState(null);
-          const [showAchievement, setShowAchievement] = useState(null);
+        };
+        
+        let timerInterval;
 
-          // Timer effect
-          useEffect(() => {
-            const interval = setInterval(() => {
-              setActivities(prev => {
-                const newState = { ...prev };
-                Object.keys(newState).forEach(key => {
-                  if (newState[key].isActive) {
-                    newState[key].timer += 1;
-                  }
+        // Initialize app
+        function init() {
+            console.log('App initialized');
+            startTimerLoop();
+            updateUI();
+        }
+
+        // Timer loop
+        function startTimerLoop() {
+            timerInterval = setInterval(() => {
+                Object.keys(activities).forEach(key => {
+                    if (activities[key].isActive) {
+                        activities[key].timer += 1;
+                        updateTimer(key);
+                    }
                 });
-                return newState;
-              });
             }, 1000);
+        }
 
-            return () => clearInterval(interval);
-          }, []);
-
-          const formatTime = (seconds) => {
+        // Format time
+        function formatTime(seconds) {
             const mins = Math.floor(seconds / 60);
             const secs = seconds % 60;
             return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-          };
+        }
 
-          const toggleActivity = (activityType) => {
-            setActivities(prev => {
-              const newState = { ...prev };
-              const activity = newState[activityType];
-              
-              if (activity.isActive) {
+        // Update timer display
+        function updateTimer(activityType) {
+            const timerEl = document.getElementById(activityType + 'Timer');
+            if (timerEl) {
+                timerEl.textContent = formatTime(activities[activityType].timer);
+            }
+        }
+
+        // Toggle activity
+        function toggleActivity(activityType) {
+            const activity = activities[activityType];
+            
+            if (activity.completedToday) {
+                return; // Already completed today
+            }
+            
+            if (activity.isActive) {
                 // Stop timer and record completion
                 activity.isActive = false;
                 if (activity.timer > 0) {
-                  activity.completedToday = true;
-                  recordCompletion(activityType);
+                    activity.completedToday = true;
+                    recordCompletion(activityType);
                 }
-              } else {
+            } else {
                 // Start timer
                 activity.isActive = true;
                 activity.timer = 0;
-              }
-              
-              return newState;
-            });
-          };
+            }
+            
+            updateUI();
+        }
 
-          const recordCompletion = (activityType) => {
+        // Record completion
+        function recordCompletion(activityType) {
             const today = new Date().toDateString();
             
-            setCompletedDays(prev => {
-              const newDays = { ...prev };
-              if (!newDays[activityType].includes(today)) {
-                newDays[activityType].push(today);
+            if (!completedDays[activityType].includes(today)) {
+                completedDays[activityType].push(today);
                 
                 // Show celebration
-                setShowCelebration(activityType);
-                setTimeout(() => setShowCelebration(null), 3000);
+                showCelebration(activityType);
                 
                 // Check for streaks
-                checkStreak(activityType, [...newDays[activityType]]);
-              }
-              return newDays;
-            });
-          };
-
-          const checkStreak = (activityType, days) => {
-            if (days.length >= 3) {
-              setShowAchievement(activityType);
-              setTimeout(() => setShowAchievement(null), 5000);
+                if (completedDays[activityType].length >= 3) {
+                    setTimeout(() => showAchievement(activityType), 1000);
+                }
             }
-          };
-
-          const getButtonClass = (activityType) => {
-            const activity = activities[activityType];
-            const baseClass = "w-40 h-40 rounded-3xl border-4 transition-all duration-200 flex flex-col items-center justify-center gap-2 text-white font-bold text-lg shadow-lg active:scale-95 hover:scale-105 cursor-pointer";
             
-            if (activity.completedToday) {
-              return `${baseClass} bg-green-500 border-green-400 shadow-green-300`;
-            } else if (activity.isActive) {
-              return `${baseClass} bg-blue-500 border-blue-400 shadow-blue-300 animate-pulse`;
-            } else {
-              return `${baseClass} bg-gray-600 border-gray-500 shadow-gray-400 hover:bg-gray-500`;
+            updateStreakDisplay(activityType);
+        }
+
+        // Show celebration
+        function showCelebration(activityType) {
+            const modal = document.getElementById('celebrationModal');
+            const text = document.getElementById('celebrationText');
+            
+            text.textContent = activityType === 'brushTeeth' ? 'Teeth brushed!' : 'Shower completed!';
+            modal.style.display = 'flex';
+            
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 3000);
+        }
+
+        // Show achievement
+        function showAchievement(activityType) {
+            const modal = document.getElementById('achievementModal');
+            const text = document.getElementById('achievementText');
+            
+            text.textContent = `3-day streak for ${activityType === 'brushTeeth' ? 'brushing teeth' : 'taking showers'}!`;
+            modal.style.display = 'flex';
+            
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 5000);
+        }
+
+        // Update UI
+        function updateUI() {
+            Object.keys(activities).forEach(activityType => {
+                const btn = document.getElementById(activityType + 'Btn');
+                const timer = document.getElementById(activityType + 'Timer');
+                const check = document.getElementById(activityType + 'Check');
+                const activity = activities[activityType];
+                
+                // Update button class
+                btn.className = 'timer-button ' + (
+                    activity.completedToday ? 'completed' :
+                    activity.isActive ? 'active' : 'inactive'
+                );
+                
+                // Update timer visibility
+                if (activity.isActive) {
+                    timer.style.display = 'block';
+                    check.style.display = 'none';
+                } else if (activity.completedToday) {
+                    timer.style.display = 'none';
+                    check.style.display = 'block';
+                } else {
+                    timer.style.display = 'none';
+                    check.style.display = 'none';
+                }
+                
+                // Disable button if completed
+                btn.disabled = activity.completedToday;
+            });
+        }
+
+        // Update streak display
+        function updateStreakDisplay(activityType) {
+            const streakEl = document.getElementById(activityType + 'Streak');
+            const dotsEl = document.getElementById(activityType + 'Dots');
+            
+            if (streakEl) {
+                streakEl.textContent = completedDays[activityType].length;
             }
-          };
+            
+            if (dotsEl) {
+                dotsEl.innerHTML = '';
+                completedDays[activityType].slice(-7).forEach(() => {
+                    const dot = document.createElement('div');
+                    dot.className = 'streak-dot';
+                    dotsEl.appendChild(dot);
+                });
+            }
+        }
 
-          const ActivityButton = ({ activityType, icon, label }) => (
-            <div className="flex flex-col items-center gap-4">
-              <button
-                onClick={() => toggleActivity(activityType)}
-                className={getButtonClass(activityType)}
-                disabled={activities[activityType].completedToday}
-              >
-                <div className="text-4xl">{icon}</div>
-                <span className="text-sm font-medium">{label}</span>
-                {activities[activityType].isActive && (
-                  <div className="text-2xl font-mono">{formatTime(activities[activityType].timer)}</div>
-                )}
-                {activities[activityType].completedToday && (
-                  <div className="text-green-200">✓</div>
-                )}
-              </button>
-              <div className="text-center">
-                <div className="text-sm text-white/80 mb-1">
-                  Streak: {completedDays[activityType].length} days
-                </div>
-                <div className="flex gap-1">
-                  {completedDays[activityType].slice(-7).map((day, idx) => (
-                    <div
-                      key={idx}
-                      className="w-3 h-3 rounded-full bg-green-400"
-                      title={day}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          );
-
-          return (
-            <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500 p-8">
-              <div className="max-w-4xl mx-auto">
-                <div className="text-center mb-12">
-                  <h1 className="text-4xl font-bold text-white mb-4 flex items-center justify-center gap-3">
-                    <span className="text-yellow-300 text-3xl">✨</span>
-                    Daily Routine Tracker
-                    <span className="text-yellow-300 text-3xl">✨</span>
-                  </h1>
-                  <p className="text-xl text-white/90">
-                    Tap to start • Tap again to finish • Build your streak!
-                  </p>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 justify-items-center mb-12">
-                  <ActivityButton
-                    activityType="brushTeeth"
-                    icon="🦷"
-                    label="Brush Teeth"
-                  />
-                  <ActivityButton
-                    activityType="shower"
-                    icon="🚿"
-                    label="Take Shower"
-                  />
-                </div>
-                
-                {/* Celebration Modal */}
-                {showCelebration && (
-                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-3xl p-8 text-center animate-bounce">
-                      <div className="text-6xl mb-4">🎉</div>
-                      <h2 className="text-3xl font-bold text-gray-800 mb-2">Great Job!</h2>
-                      <p className="text-lg text-gray-600">
-                        {showCelebration === 'brushTeeth' ? 'Teeth brushed!' : 'Shower completed!'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Achievement Modal */}
-                {showAchievement && (
-                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-3xl p-8 text-center animate-pulse">
-                      <div className="text-6xl mb-4">🏆</div>
-                      <h2 className="text-3xl font-bold text-white mb-2">ACHIEVEMENT UNLOCKED!</h2>
-                      <p className="text-xl text-white">
-                        3-day streak for {showAchievement === 'brushTeeth' ? 'brushing teeth' : 'taking showers'}!
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        };
-
-        // Error handling for rendering
-        try {
-          const root = ReactDOM.createRoot(document.getElementById('root'));
-          root.render(React.createElement(RoutineTracker));
-        } catch (error) {
-          console.error('Error rendering app:', error);
-          document.getElementById('root').innerHTML = `
-            <div class="min-h-screen bg-red-100 flex items-center justify-center">
-              <div class="text-red-800 text-center">
-                <h1 class="text-2xl font-bold mb-4">Error Loading App</h1>
-                <p>Please check the console for details.</p>
-                <p class="mt-2 text-sm">${error.message}</p>
-              </div>
-            </div>
-          `;
+        // Start the app when page loads
+        window.addEventListener('load', init);
+        
+        // Fallback initialization
+        if (document.readyState === 'complete') {
+            init();
         }
     </script>
 </body>
